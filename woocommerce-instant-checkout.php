@@ -28,7 +28,9 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 	class woocommerce_instant_checkout {
 
 		private static $_this;
+		public $button_label;
 		public $path;
+		public $action;
 		public $plugin_key = 'instant_checkout';
 		public $meta_key = '_instant_checkout';
 		const MIN_WP_VERSION = '3.7';
@@ -36,6 +38,14 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 		function __construct() {
 
 			$this->path = trailingslashit( dirname( __FILE__ ) );
+			$this->action = get_option('woocommerce_instant_checkout_action');
+			if( empty( $this->action ) )
+				$this->action = 'redirect';
+			$this->button_label = get_option('woocommerce_instant_checkout_button_label');
+			if( empty( $this->button_label ) )
+				$this->button_label = __( 'Buy Now', 'woocommerce_instant_checkout' );
+
+			
 
 			// action hooks
 			add_action( 'init', array( $this, 'init' ) );
@@ -48,6 +58,7 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 			add_filter( 'product_type_options', array( $this, 'product_type_options' ) );
 			add_filter( 'woocommerce_product_single_add_to_cart_text', array( $this, 'add_to_cart_text' ) );
 			add_filter( 'woocommerce_product_filters', array( $this, 'wc_product_filters' ) );
+			add_filter( 'woocommerce_payment_gateways_settings', array( $this, 'wc_payment_gateways_settings' ) );
 
 		}
 
@@ -55,9 +66,49 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 			// echo 'woo ic init';
 		}
 
+		function wc_payment_gateways_settings( $settings ){
+			$insert_at = 0;
+			foreach( $settings as $key => $setting ){
+				if( $setting['type'] == 'sectionend' && $setting['id'] == 'checkout_process_options' )
+					$insert_at = $key;
+			}
+			array_splice( $settings, 
+						  $insert_at, 
+						  0, 
+						  array(
+						  	array(
+							  	'title'         => __( 'Instant Checkout', 'woocommerce_instant_checkout' ),
+								'desc'          => __( 'This will control the way a user will be able to checkout when adding a product enabled for instant checkout to the cart.', 'woocommerce_instant_checkout' ),
+								'desc_tip'      => __( 'Allows customers to checkout without creating an account.', 'woocommerce_instant_checkout' ),
+								'id'            => 'woocommerce_instant_checkout_action',
+								'default'       => 'redirect',
+								'type'          => 'radio',
+								'options'       => array(
+									'redirect'  => __( 'Redirect to checkout', 'woocommerce_instant_checkout' ),
+									'modal'     => __( 'Display a popup modal for the checkout', 'woocommerce_instant_checkout' ),
+								),
+								'desc_tip'      =>  true,
+								'autoload'      => false
+							),
+							array(
+								'desc'     => __( '"Buy Now" button label for product', 'woocommerce_instant_checkout' ),
+								'id'       => 'woocommerce_instant_checkout_button_label',
+								'type'     => 'text',
+								'default'  => $this->button_label,
+							),
+			  	));
+			// echo '<pre>';
+			// print_r($settings);
+			// echo '</pre>';
+			return $settings;
+		}
+
 		function wc_process_product_meta( $post_id, $post ){
-			$is_instant_checkout = isset( $_POST[ $this->meta_key ] ) ? 'yes' : 'no';
-			update_post_meta( $post_id, $this->meta_key, $is_instant_checkout );
+			update_post_meta( 
+				$post_id, 
+				$this->meta_key, 
+				isset( $_POST[ $this->meta_key ] ) ? 'yes' : 'no' 
+			);
 		}
 
 		function wc_product_filters( $filters_html ){
@@ -79,11 +130,13 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 			global $post;
 
 			if ( !empty( $_REQUEST['add-to-cart'] ) && 
-				  is_numeric( $_REQUEST['add-to-cart'] ) &&
-				  $this->is_instant_checkout( $post->ID ) ) {
-					wc_clear_notices();
-					wp_safe_redirect( WC()->cart->get_checkout_url() );
-					exit;
+				is_numeric( $_REQUEST['add-to-cart'] ) &&
+				$this->is_instant_checkout( $post->ID ) &&
+				$this->action == 'redirect' ) {
+				// echo 'test redirect success';
+				wc_clear_notices();
+				wp_safe_redirect( WC()->cart->get_checkout_url() );
+				exit;
 			}
 
 		}
@@ -92,7 +145,7 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 			global $post;
 			if( $this->is_instant_checkout( $post->ID ) ){
 				// TODO customizable label
-				$label = __( 'Buy Now' );
+				$label = $this->button_label;
 			}
 			return $label;
 		}
@@ -128,7 +181,7 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 		}
 
 		public function is_instant_checkout( $post_id ){
-			$is_instant_checkout = update_post_meta( $post_id, $this->meta_key, true );
+			$is_instant_checkout = get_post_meta( $post_id, $this->meta_key, true );
 			return $is_instant_checkout == 'yes';
 		}
 
