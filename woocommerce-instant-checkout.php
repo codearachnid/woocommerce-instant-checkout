@@ -29,7 +29,9 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 
 		private static $_this;
 		public $button_label;
+		public $modal_title;
 		public $path;
+		public $url;
 		public $action;
 		public $plugin_key = 'instant_checkout';
 		public $meta_key = '_instant_checkout';
@@ -37,24 +39,28 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 
 		function __construct() {
 
-			$this->path = trailingslashit( dirname( __FILE__ ) );
+			$this->path = plugin_dir_path( __FILE__ );
+			$this->url = plugin_dir_url( __FILE__ );
 			$this->action = get_option('woocommerce_instant_checkout_action');
 			if( empty( $this->action ) )
 				$this->action = 'redirect';
 			$this->button_label = get_option('woocommerce_instant_checkout_button_label');
 			if( empty( $this->button_label ) )
 				$this->button_label = __( 'Buy Now', 'woocommerce_instant_checkout' );
-
+			if( empty( $this->modal_title ) )
+				$this->modal_title = __( 'Checkout', 'woocommerce_instant_checkout' );
 			
 
 			// action hooks
 			add_action( 'init', array( $this, 'init' ) );
+			add_filter( 'wp_footer', array( $this, 'wp_footer' ) );
 			add_action( 'manage_product_posts_custom_column', array( $this, 'render_product_columns' ), 2 );
 			add_action( 'woocommerce_process_product_meta', array( $this, 'wc_process_product_meta' ), 10, 2 );
 			add_action( 'template_redirect', array( $this, 'redirect_to_checkout' ), 100 );
 
 			// filter hooks
 			add_filter( 'parse_query', array( $this, 'product_filters_query' ), 30 );
+			add_filter( 'body_class', array( $this, 'body_class' ) );
 			add_filter( 'product_type_options', array( $this, 'product_type_options' ) );
 			add_filter( 'woocommerce_product_single_add_to_cart_text', array( $this, 'add_to_cart_text' ) );
 			add_filter( 'woocommerce_product_filters', array( $this, 'wc_product_filters' ) );
@@ -64,6 +70,28 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 
 		function init() {
 			// echo 'woo ic init';
+		}
+
+		function body_class( $classes ){
+			global $post;
+			if( $this->is_instant_checkout( $post->ID ) ){
+				$classes[] = $this->plugin_key;
+
+				if( $this->action == 'modal' )
+					$classes[] = 'instant_checkout_modal';
+			}
+			return $classes;
+		}
+
+		function wp_footer(){
+			?>
+			<div id="instant_checkout_modal">
+				<h1>
+					<span class="title"><?php echo $this->modal_title; ?></span>
+					<span class="close"></span>
+				</h1>
+			</div>
+			<?php
 		}
 
 		function wc_payment_gateways_settings( $settings ){
@@ -78,8 +106,8 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 						  array(
 						  	array(
 							  	'title'         => __( 'Instant Checkout', 'woocommerce_instant_checkout' ),
-								'desc'          => __( 'This will control the way a user will be able to checkout when adding a product enabled for instant checkout to the cart.', 'woocommerce_instant_checkout' ),
-								'desc_tip'      => __( 'Allows customers to checkout without creating an account.', 'woocommerce_instant_checkout' ),
+								'desc'          => __( 'Set the way a user will be able to checkout when adding a product enabled for instant checkout to the cart. If you select the option to display a modal on the product page it is suggested that you also require "Force secure checkout" in order to protect your customer\'s private data.', 'woocommerce_instant_checkout' ),
+								// 'desc_tip'      => __( 'Allows customers to checkout without creating an account.', 'woocommerce_instant_checkout' ),
 								'id'            => 'woocommerce_instant_checkout_action',
 								'default'       => 'redirect',
 								'type'          => 'radio',
@@ -87,7 +115,7 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 									'redirect'  => __( 'Redirect to checkout', 'woocommerce_instant_checkout' ),
 									'modal'     => __( 'Display a popup modal for the checkout', 'woocommerce_instant_checkout' ),
 								),
-								'desc_tip'      =>  true,
+								// 'desc_tip'      =>  true,
 								'autoload'      => false
 							),
 							array(
@@ -129,14 +157,32 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 		function redirect_to_checkout() {
 			global $post;
 
-			if ( !empty( $_REQUEST['add-to-cart'] ) && 
-				is_numeric( $_REQUEST['add-to-cart'] ) &&
-				$this->is_instant_checkout( $post->ID ) &&
-				$this->action == 'redirect' ) {
-				// echo 'test redirect success';
-				wc_clear_notices();
-				wp_safe_redirect( WC()->cart->get_checkout_url() );
-				exit;
+			if( is_admin() )
+				return;
+
+			if( $this->is_instant_checkout( $post->ID ) ) {
+
+				if ( !empty( $_REQUEST['add-to-cart'] ) && 
+					is_numeric( $_REQUEST['add-to-cart'] ) &&
+					$this->action == 'redirect' ) {
+					// echo 'test redirect success';
+					wc_clear_notices();
+					wp_safe_redirect( WC()->cart->get_checkout_url() );
+					exit;
+				}
+
+				if( 'yes' == get_option( 'woocommerce_force_ssl_checkout' ) ){
+					
+					$goto = str_replace( 'http://', 'https://', get_permalink( $post->ID ) );
+					if( !empty( $_GET ) ) {
+						$goto .= '?' . http_build_query($_GET);
+					}
+					wp_redirect( $goto, 301 );
+					exit;
+				}
+
+				wp_enqueue_style( 'woocommerce_instant_checkout',  $this->url . 'woocommerce-instant-checkout.css' );
+				wp_enqueue_script( 'woocommerce_instant_checkout',  $this->url . 'woocommerce-instant-checkout.js', array( 'jquery' ) );
 			}
 
 		}
