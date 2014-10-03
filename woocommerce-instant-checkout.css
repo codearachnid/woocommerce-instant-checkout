@@ -1,10 +1,10 @@
 body.instant_checkout #instant_checkout_modal{
 	display:none;
 	width:600px;
-	height:400px;
+	/*height:400px;*/
 	background: #ffffff;
 	position: absolute;
-	top:0;
+	top:30px;
 	left:0;
 	z-index: 9999;
 	border:1px solid #aaaaaa;
@@ -33,10 +33,13 @@ body.instant_checkout #instant_checkout_modal h1 span.close{
 }
 body.instant_checkout #instant_checkout_modal h1 span.close:before{
 	content: '\f158';
-	font: 400 20px/1 dashicons;
+	font: 400 30px/1 dashicons;
 	speak: none;
 	vertical-align: middle;
 	-webkit-font-smoothing: antialiased;
 	-moz-osx-font-smoothing: grayscale;
 	color: #ffffff;
+}
+body.instant_checkout #instant_checkout_modal > .checkout{
+	padding:0 15px;
 }

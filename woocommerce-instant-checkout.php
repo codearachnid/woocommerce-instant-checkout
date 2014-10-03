@@ -90,6 +90,9 @@ if ( !class_exists( 'woocommerce_instant_checkout' ) ) {
 					<span class="title"><?php echo $this->modal_title; ?></span>
 					<span class="close"></span>
 				</h1>
+				<div class="checkout">
+					<?php echo do_shortcode('[woocommerce_checkout]'); ?>
+				</div>
 			</div>
 			<?php
 		}

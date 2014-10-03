@@ -8,6 +8,10 @@ jQuery(document).ready(function(){
 		});
 		product.on("submit", function(e){
 			e.preventDefault();
+			console.log( jQuery( this ).serialize() );
+			jQuery.post( '', jQuery( this ).serialize(), function(){
+				console.log('submitted')
+			});
 			// console.log(e);
 			// jQuery(this).find('.button').removeAttr('disabled');
 			
@@ -16,9 +20,9 @@ jQuery(document).ready(function(){
 		}).find( ':submit' ).on( 'click', function(e){
 			console.log(e);
 			modal.css({
-				'top': e.pageY - ( modal.height() / 2 ),
-				'left': ( jQuery(document).width() / 2 ) - ( modal.width() / 2 )
-			}).fadeIn();
+				// 'top': '30px',
+				'left': ( jQuery(window).width() / 2 ) - ( modal.width() / 2 )
+			}).fadeIn(); //.height( modal.find('.checkout').height() );
 			jQuery(this).removeAttr('disabled');
 		});
 	}
